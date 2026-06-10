@@ -1,0 +1,22 @@
+*.pyc
+*.log
+node_modules
+coverage/
+arches_zod_validation/logs
+arches_zod_validation/export_deliverables
+arches_zod_validation/cantaloupe/*
+arches_zod_validation/staticfiles
+arches_zod_validation/media/packages
+arches_zod_validation/media/build/
+arches_zod_validation/uploadedfiles/*
+arches_zod_validation/settings_local.py
+webpack-stats.json
+.vscode/
+*.egg-info
+.DS_STORE
+CACHE
+frontend_configuration
+
+# Packaging
+build/
+dist/
