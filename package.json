@@ -18,10 +18,11 @@
         "vitest": "vitest --run --coverage"
     },
     "dependencies": {
-        "arches": "archesproject/arches#stable/8.1.2"
+        "arches": "bcgov/arches#stable/8.0.10_bcgov",
+        "zod": "^4.1.5"
     },
     "devDependencies": {
-        "arches-dev-dependencies": "archesproject/arches-dev-dependencies#stable/8.1.2"
+        "arches-dev-dependencies": "archesproject/arches-dev-dependencies#stable/8.0.102"
     },
     "nodeModulesPaths": {
     },
