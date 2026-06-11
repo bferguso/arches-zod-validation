@@ -51,7 +51,7 @@ FILENAME_GENERATOR = "arches.app.utils.storage_filename_generator.generate_filen
 UPLOADED_FILES_DIR = "uploadedfiles"
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-ulzg440bj%r!a-l$3$cbh+9=c)#c*3@yxws69t2!(6usdpla9+"
+SECRET_KEY = "django-insecure-ve$w()!2p1nnv0oiki%)-25x=3a%#u4*75%fsbmflz1ti82$nm"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
