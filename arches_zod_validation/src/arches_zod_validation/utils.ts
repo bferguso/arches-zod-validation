@@ -3,7 +3,7 @@ import type { LanguageValue } from '@/arches_component_lab/datatypes/string/type
 import type { GeoJSONFeatureCollectionValue } from '@/arches_component_lab/datatypes/geojson-feature-collection/types.ts';
 import type { AliasedNodeData } from '@/arches_component_lab/types.ts';
 import type { FormInstance } from '@primevue/forms';
-import type { GenericZodObjectType } from '@/bcgov_arches_common/validation-utils.ts';
+import type { GenericZodObjectType } from '@/arches_zod_validation/validation-utils.ts';
 
 export const blankStringValue = function () {
     return {

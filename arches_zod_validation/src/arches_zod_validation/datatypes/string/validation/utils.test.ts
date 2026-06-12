@@ -1,6 +1,120 @@
-// htmlToPlainText.test.ts
 import { describe, it, expect } from 'vitest';
-import { htmlToPlainText } from './utils.ts'; // <-- adjust path as needed
+import {
+    convertNbspStringToSpaces,
+    convertNbspToSpaces,
+    htmlToPlainText,
+} from './utils.ts';
+import type { StringValue } from '@/arches_component_lab/datatypes/string/types.ts';
+
+function makeStringValue(
+    nodeValues: Record<string, string>,
+    displayValue: string,
+): StringValue {
+    const node_value: Record<
+        string,
+        { value: string; direction: 'ltr' | 'rtl' }
+    > = {};
+    for (const [lang, value] of Object.entries(nodeValues)) {
+        node_value[lang] = { value, direction: 'ltr' };
+    }
+    return {
+        node_value,
+        display_value: displayValue,
+        details: [],
+    } as StringValue;
+}
+
+describe('convertNbspStringToSpaces', () => {
+    it('returns falsy values unchanged', () => {
+        expect(convertNbspStringToSpaces('')).toBe('');
+        // @ts-expect-error
+        expect(convertNbspStringToSpaces(null)).toBeNull();
+        // @ts-expect-error
+        expect(convertNbspStringToSpaces(undefined)).toBeUndefined();
+    });
+
+    it('replaces &nbsp; HTML entities with regular spaces', () => {
+        expect(convertNbspStringToSpaces('Hello&nbsp;world')).toBe(
+            'Hello world',
+        );
+        expect(convertNbspStringToSpaces('a&nbsp;b&nbsp;c')).toBe('a b c');
+    });
+
+    it('replaces \\u00A0 non-breaking space characters with regular spaces', () => {
+        expect(convertNbspStringToSpaces('Hello\u00A0world')).toBe(
+            'Hello world',
+        );
+        expect(convertNbspStringToSpaces('a\u00A0b\u00A0c')).toBe('a b c');
+    });
+
+    it('replaces both &nbsp; entities and \\u00A0 characters in the same string', () => {
+        expect(convertNbspStringToSpaces('a&nbsp;b\u00A0c')).toBe('a b c');
+    });
+
+    it('returns the string unchanged when no non-breaking spaces are present', () => {
+        expect(convertNbspStringToSpaces('Hello world')).toBe('Hello world');
+        expect(convertNbspStringToSpaces('<p>Normal text</p>')).toBe(
+            '<p>Normal text</p>',
+        );
+    });
+});
+
+describe('convertNbspToSpaces', () => {
+    it('returns falsy values unchanged', () => {
+        // @ts-expect-error
+        expect(convertNbspToSpaces(null)).toBeNull();
+        // @ts-expect-error
+        expect(convertNbspToSpaces(undefined)).toBeUndefined();
+    });
+
+    it('replaces &nbsp; in node_value language entries', () => {
+        const val = makeStringValue(
+            { en: 'Hello&nbsp;world' },
+            'Hello&nbsp;world',
+        );
+        const result = convertNbspToSpaces(val);
+        expect(result?.node_value?.['en'].value).toBe('Hello world');
+    });
+
+    it('replaces &nbsp; in display_value', () => {
+        const val = makeStringValue({ en: 'Hello world' }, 'Hello&nbsp;world');
+        const result = convertNbspToSpaces(val);
+        expect(result?.display_value).toBe('Hello world');
+    });
+
+    it('replaces \\u00A0 in both node_value and display_value', () => {
+        const val = makeStringValue({ en: 'a\u00A0b' }, 'c\u00A0d');
+        const result = convertNbspToSpaces(val);
+        expect(result?.node_value?.['en'].value).toBe('a b');
+        expect(result?.display_value).toBe('c d');
+    });
+
+    it('processes multiple language entries', () => {
+        const val = makeStringValue(
+            { en: 'Hello&nbsp;world', fr: 'Bonjour&nbsp;monde' },
+            'Hello&nbsp;world',
+        );
+        const result = convertNbspToSpaces(val);
+        expect(result?.node_value?.['en'].value).toBe('Hello world');
+        expect(result?.node_value?.['fr'].value).toBe('Bonjour monde');
+    });
+
+    it('skips language entries where value is falsy', () => {
+        const val = makeStringValue({}, 'Hello&nbsp;world');
+        val.node_value = { en: { value: '', direction: 'ltr' } };
+        const result = convertNbspToSpaces(val);
+        expect(result?.node_value?.['en'].value).toBe('');
+    });
+
+    it('mutates and returns the same object reference', () => {
+        const val = makeStringValue(
+            { en: 'Hello&nbsp;world' },
+            'Hello&nbsp;world',
+        );
+        const result = convertNbspToSpaces(val);
+        expect(result).toBe(val);
+    });
+});
 
 describe('htmlToPlainText – DOM environment', () => {
     // If tests are running in a pure Node env without jsdom, we skip DOM-specific tests.

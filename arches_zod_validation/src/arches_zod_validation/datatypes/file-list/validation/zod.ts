@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MimeType } from '@/bcgov_arches_common/datatypes/file-list/validation/constants.ts';
+import { MimeType } from '@/arches_zod_validation/datatypes/file-list/validation/constants.ts';
 
 const blobUrlFormat = z
     .string()

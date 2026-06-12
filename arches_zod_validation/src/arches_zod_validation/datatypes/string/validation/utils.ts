@@ -1,3 +1,25 @@
+import type { StringValue } from '@/arches_component_lab/datatypes/string/types.ts';
+
+export function convertNbspToSpaces(stringValue: StringValue) {
+    if (!stringValue) return stringValue;
+    const val = stringValue;
+    Object.keys(val.node_value as object).forEach((lang) => {
+        if (val?.node_value?.[lang]?.value) {
+            val.node_value[lang].value = convertNbspStringToSpaces(
+                val.node_value[lang].value,
+            );
+        }
+    });
+    val.display_value = convertNbspStringToSpaces(val.display_value);
+    return val;
+}
+
+export function convertNbspStringToSpaces(value: string) {
+    return !value
+        ? value
+        : value.replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
+}
+
 export function htmlToPlainText(html: string): string {
     if (!html) return '';
 

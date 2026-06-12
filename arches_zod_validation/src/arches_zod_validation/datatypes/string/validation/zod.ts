@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { htmlToPlainText } from '@/bcgov_arches_common/datatypes/string/validation/utils.ts';
+import { htmlToPlainText } from '@/arches_zod_validation/datatypes/string/validation/utils.ts';
 
 /* Internal StringValue types */
 /* @todo - Make languanges configurable */
