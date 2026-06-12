@@ -57,9 +57,13 @@ class Command(BaseCommand):
             help="OpenAPI spec output file. Default: schema.yml",
         )
         parser.add_argument(
-            "--npm-script",
-            default="openapi:zod",
-            help="package.json script for zod generation. Default: openapi:zod",
+            "--zod-cmd",
+            default=None,
+            help=(
+                "Override the zod-generation command (space-separated). "
+                "Default: the project's node_modules/.bin/openapi-ts, "
+                "falling back to 'npx --no-install openapi-ts'."
+            ),
         )
         parser.add_argument(
             "--skip-views",
@@ -101,6 +105,27 @@ class Command(BaseCommand):
             )
         return candidate
 
+    def resolve_zod_cmd(self, override, repo_root):
+        """Command vector for openapi-ts, preferring the project's pinned copy.
+
+        Order: explicit --zod-cmd override; the binary npm installed into the
+        project's node_modules/.bin (version pinned by the lockfile); then
+        'npx --no-install openapi-ts' (still local-only: --no-install refuses
+        to silently fetch an arbitrary latest version).
+        """
+        if override:
+            return override.split()
+        local_bin = repo_root / "node_modules" / ".bin" / "openapi-ts"
+        if local_bin.exists():
+            return [str(local_bin)]
+        npx = shutil.which("npx")
+        if npx:
+            return [npx, "--no-install", "openapi-ts"]
+        raise CommandError(
+            "openapi-ts not found. Add @hey-api/openapi-ts to the project's "
+            "devDependencies and run 'npm install', or pass --skip-zod."
+        )
+
     def handle(self, *args, **options):
         project = options["project"] or default_project_name()
         urlconf = options["urlconf"] or f"{project}.urls_api_documented"
@@ -139,20 +164,14 @@ class Command(BaseCommand):
         )
 
         # --- Step 3: zod client via openapi-ts -------------------------------
+        # Invoked directly (no package.json script needed). openapi-ts reads
+        # openapi-ts.config.ts from cwd, which step 1 scaffolds at repo root.
         if options["skip_zod"]:
             self.banner("Step 3/3: zod generation (skipped)")
         else:
             self.banner("Step 3/3: zod generation (openapi-ts)")
-            npm = shutil.which("npm")
-            if npm is None:
-                raise CommandError(
-                    "npm not found on PATH. Install Node/npm or pass --skip-zod."
-                )
-            self.run_subprocess(
-                [npm, "run", options["npm_script"]],
-                step=f"npm run {options['npm_script']}",
-                cwd=repo_root,
-            )
+            argv = self.resolve_zod_cmd(options["zod_cmd"], repo_root)
+            self.run_subprocess(argv, step="openapi-ts", cwd=repo_root)
 
         # --- Optional CI drift check -----------------------------------------
         if options["check"]:
