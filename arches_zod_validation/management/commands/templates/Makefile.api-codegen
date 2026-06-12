@@ -1,0 +1,44 @@
+# API codegen pipeline. Lives at the repo root, next to manage.py.
+#
+# Each step runs in its own process ON PURPOSE: Django's startup system
+# checks import the URLconf, so a single process that ran the view
+# generator can hold stale generated modules in sys.modules. Fresh
+# processes guarantee spectacular documents the views just written.
+
+PYTHON  ?= python3.11
+PROJECT ?= bcrhp
+SCHEMA  ?= schema.yml
+
+# Everything the pipeline owns; used by the drift check.
+GENERATED = $(SCHEMA) \
+            $(PROJECT)/views/generated \
+            $(PROJECT)/urls_api_generated.py \
+            $(PROJECT)/src/$(PROJECT)/client
+
+.PHONY: api-codegen api-views api-schema api-zod api-check
+
+## Full pipeline: views -> OpenAPI spec -> zod client. Fails fast.
+api-codegen: api-views api-schema api-zod
+	@echo "API codegen complete. Review and commit: $(GENERATED)"
+
+api-views:
+	$(PYTHON) manage.py generate_graph_views --overwrite
+
+api-schema:
+	$(PYTHON) manage.py spectacular \
+		--urlconf $(PROJECT).documented_api_urls \
+		--file $(SCHEMA) \
+		--validate \
+		--fail-on-warn
+
+api-zod:
+	npm run openapi:zod
+
+## CI consistency check: regenerate the DB-independent steps (2 and 3)
+## from the committed views and assert nothing changed. Catches
+## "edited views / graphs but forgot to regenerate" drift without
+## needing graph data loaded in CI. If CI *does* have the graphs
+## loaded, use `make api-codegen` here instead for full coverage.
+api-check: api-schema api-zod
+	git diff --exit-code -- $(GENERATED) \
+		|| (echo "ERROR: generated API artifacts are stale. Run 'make api-codegen' and commit." && exit 1)

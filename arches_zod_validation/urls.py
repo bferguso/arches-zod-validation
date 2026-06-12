@@ -3,8 +3,13 @@ from django.conf.urls.static import static
 from django.conf.urls.i18n import i18n_patterns
 from django.urls import include, path
 
+documented_api_patterns = [
+    # These are the URLs that will be generated into Open API spec and Zod schemas
+    # Should be added to application urls.py
+]
 urlpatterns = [
     # project-level urls
+    *documented_api_patterns,
 ]
 
 handler400 = "arches.app.views.main.custom_400"

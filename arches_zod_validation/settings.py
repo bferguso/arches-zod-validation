@@ -144,6 +144,8 @@ INSTALLED_APPS = (
     "django_migrate_sql",
     "pgtrigger",
     # "silk",
+    "rest_framework",
+    "drf_spectacular",
     "arches_zod_validation",  # Ensure the project is listed before any other arches applications
 )
 
@@ -155,6 +157,10 @@ INSTALLED_APPS += (
     "arches.app",
     "django.contrib.admin",
 )
+
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -180,6 +186,22 @@ MIDDLEWARE.insert(  # this must resolve to first MIDDLEWARE entry
 MIDDLEWARE.append(  # this must resolve last MIDDLEWARE entry
     "django_hosts.middleware.HostsResponseMiddleware"
 )
+
+# SPECTACULAR_SETTINGS = {
+#     "TITLE": "<APP SHORT NAME> API",
+#     "DESCRIPTION": "<APP DESCRIPTION> API",
+#     "VERSION": "2.0.0",
+#     "SERVE_INCLUDE_SCHEMA": False,
+#     "SERVE_URLCONF": "<app name>.urls_api_documented",
+#     # The arches-querysets tile schemas are introspected from graph nodes whose
+#     # order isn't deterministic; order all component properties by the graph node
+#     # sortorder for stable, meaningful diffs. Keep the default enum hook.
+#     "POSTPROCESSING_HOOKS": [
+#         "drf_spectacular.hooks.postprocess_schema_enums",
+#         "arches_zod_validation.schema.sort_generated_schema_properties",
+#         "arches_zod_validation.schema.type_base_serializer_fields",
+#     ],
+# }
 
 STATICFILES_DIRS = build_staticfiles_dirs(app_root=APP_ROOT)
 

@@ -15,7 +15,8 @@
         "ts:check": "vue-tsc --noEmit",
         "ts:watch": "vue-tsc --watch --noEmit",
         "start": "cross-env webpack serve --config ./webpack/webpack.config.dev.js",
-        "vitest": "vitest --run --coverage"
+        "vitest": "vitest --run --coverage",
+        "openapi:zod": "openapi-ts"
     },
     "dependencies": {
         "arches": "bcgov/arches#stable/8.0.10_bcgov",
