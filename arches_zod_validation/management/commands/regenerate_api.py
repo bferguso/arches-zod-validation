@@ -65,7 +65,17 @@ class Command(BaseCommand):
             "--urlconf",
             default=None,
             help=(
-                "Urlconf for spectacular " "(default: <project>.urls_api_documented)."
+                "Urlconf for spectacular "
+                "(default: <project>.urls_api_documented)."
+            ),
+        )
+        parser.add_argument(
+            "--context-root",
+            default="",
+            help=(
+                "Reverse-proxy context root prepended to generated routes "
+                "(e.g. '/bcrhp/'). Any slash style accepted. Passed through "
+                "to generate_graph_views. Default: none."
             ),
         )
         parser.add_argument(
@@ -185,6 +195,7 @@ class Command(BaseCommand):
                 "generate_graph_views",
                 project=project,
                 schema_file=schema_file,
+                context_root=options["context_root"],
                 overwrite=True,  # pipeline runs must be deterministic
             )
 

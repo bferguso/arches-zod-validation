@@ -53,6 +53,19 @@ def slug_to_class_prefix(slug):
     return "".join(part.capitalize() for part in slug.replace("-", "_").split("_"))
 
 
+def normalize_path_prefix(value):
+    """Normalize a user-supplied URL prefix to Django path() form.
+
+    Accepts any slash variant -- '/bcrhp/', '/bcrhp', 'bcrhp', 'bcrhp/',
+    even '//bcrhp//api/' -- and returns clean slash-separated segments with
+    no leading or trailing slash ('bcrhp', 'bcrhp/api'). Returns '' for
+    None, empty, or bare '/'.
+    """
+    if not value:
+        return ""
+    return "/".join(segment for segment in value.strip().split("/") if segment)
+
+
 def default_project_name():
     """The Django project package name, e.g. ``bcrhp``.
 
@@ -112,10 +125,20 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--url-prefix",
-            default="api/external",
+            default="api",
             help=(
-                "URL prefix for the generated routes, without leading or "
-                "trailing slashes. Default: api/external"
+                "URL prefix for the generated routes. Any slash style is "
+                "accepted and normalized. Default: api"
+            ),
+        )
+        parser.add_argument(
+            "--context-root",
+            default="",
+            help=(
+                "Reverse-proxy context root to prepend to all generated "
+                "routes, e.g. when the app is served at /bcrhp/. Accepts "
+                "'/bcrhp/', '/bcrhp', 'bcrhp', or 'bcrhp/' interchangeably. "
+                "Default: none."
             ),
         )
         parser.add_argument(
@@ -171,10 +194,20 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         project = options["project"] or default_project_name()
-        url_prefix = options["url_prefix"].strip("/")
         schema_file = options["schema_file"]
         dry_run = options["dry_run"]
         overwrite = options["overwrite"]
+
+        # Both inputs tolerate any slash style ('/bcrhp/', 'bcrhp', ...).
+        # Composed result has no leading slash (Django path() requirement);
+        # the urls template supplies the slashes between/after segments.
+        context_root = normalize_path_prefix(options["context_root"])
+        url_prefix = normalize_path_prefix(options["url_prefix"])
+        full_prefix = "/".join(part for part in (context_root, url_prefix) if part)
+        # Trailing slash carried here, not in the template, so an empty
+        # prefix yields 'heritage_site/' rather than '/heritage_site/'
+        # (Django path() routes must not start with a slash).
+        route_prefix = f"{full_prefix}/" if full_prefix else ""
 
         project_dir = resolve_project_dir(project)
         views_dir = project_dir / "views"
@@ -248,7 +281,7 @@ class Command(BaseCommand):
         urls_content = self.render(
             engine,
             "urls_api_generated.py-tpl",
-            {"entries": entries, "project": project, "url_prefix": url_prefix},
+            {"entries": entries, "project": project, "url_prefix": route_prefix},
         )
         self.write(project_dir / "urls_api_generated.py", urls_content, dry_run)
 
