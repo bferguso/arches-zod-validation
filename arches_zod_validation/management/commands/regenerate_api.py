@@ -41,6 +41,14 @@ from .generate_graph_views import default_project_name
 
 
 class Command(BaseCommand):
+    # Skip pre-command system checks: on a fresh project, ROOT_URLCONF may
+    # include() the not-yet-existing urls_api_generated module, and default
+    # checks import the URLconf -- the command would die before step 0 could
+    # scaffold the stub that fixes it. Nothing is lost: step 2 runs
+    # spectacular in a fresh subprocess, which performs full system checks
+    # against the files written by steps 0-1.
+    requires_system_checks = []
+
     help = (
         "Run the full API codegen pipeline: generated views -> OpenAPI spec "
         "(drf_spectacular) -> zod client (openapi-ts) -> formatting "
@@ -162,6 +170,11 @@ class Command(BaseCommand):
             f"{project}/urls_api_generated.py",
         ]
         client_dir = f"{project}/src/{project}/client"
+
+        # --- Step 0: scaffold first-run files (write-if-missing) -------------
+        # Idempotent; a no-op on already-bootstrapped projects.
+        self.banner("Step 0/4: bootstrap_api")
+        call_command("bootstrap_api", project=project)
 
         # --- Step 1: generated views + urls (in-process; writes only) -------
         if options["skip_views"]:

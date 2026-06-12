@@ -65,7 +65,35 @@ def default_project_name():
     return settings.SETTINGS_MODULE.split(".")[0]
 
 
+def resolve_project_dir(project):
+    """Locate the project package on disk by importing it.
+
+    Resolving via import (never by joining a relative path to CWD)
+    guarantees we write into the real package and can never create a
+    stray directory that shadows it.
+    """
+    try:
+        module = importlib.import_module(project)
+    except ImportError as err:
+        raise CommandError(
+            f"Could not import project package '{project}': {err}"
+        ) from err
+    if not getattr(module, "__file__", None):
+        raise CommandError(
+            f"'{project}' resolves to a namespace package (no __init__.py) "
+            "-- refusing to write into it. Check for a stray directory "
+            "shadowing the real package."
+        )
+    return Path(module.__file__).resolve().parent
+
+
 class Command(BaseCommand):
+    # This command only writes files; it must work on a fresh project whose
+    # ROOT_URLCONF may not import yet (e.g. it includes the not-yet-created
+    # urls_api_generated module). Default system checks import the URLconf,
+    # so they are skipped here.
+    requires_system_checks = []
+
     help = (
         "Generate read-only, user-scoped DRF views (list + detail) for every "
         "resource graph into the project package, a urls_api_generated.py "
@@ -115,6 +143,7 @@ class Command(BaseCommand):
     def get_graphs(self):
         return (
             models.Graph.objects.order_by("slug")
+            .filter(isresource=True)
             .exclude(slug="arches_system_settings")
             .exclude(source_identifier__isnull=False)
             .all()
@@ -140,27 +169,6 @@ class Command(BaseCommand):
             path.write_text(content, encoding="utf-8")
             self.stdout.write(self.style.SUCCESS(f"Wrote {path}"))
 
-    def resolve_project_dir(self, project):
-        """Locate the project package on disk by importing it.
-
-        Resolving via import (never by joining a relative path to CWD)
-        guarantees we write into the real package and can never create a
-        stray directory that shadows it.
-        """
-        try:
-            module = importlib.import_module(project)
-        except ImportError as err:
-            raise CommandError(
-                f"Could not import project package '{project}': {err}"
-            ) from err
-        if not getattr(module, "__file__", None):
-            raise CommandError(
-                f"'{project}' resolves to a namespace package (no __init__.py) "
-                "-- refusing to write into it. Check for a stray directory "
-                "shadowing the real package."
-            )
-        return Path(module.__file__).resolve().parent
-
     def handle(self, *args, **options):
         project = options["project"] or default_project_name()
         url_prefix = options["url_prefix"].strip("/")
@@ -168,7 +176,7 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         overwrite = options["overwrite"]
 
-        project_dir = self.resolve_project_dir(project)
+        project_dir = resolve_project_dir(project)
         views_dir = project_dir / "views"
         generated_dir = views_dir / "generated"
 
