@@ -37,6 +37,7 @@ Command layout:
 """
 
 import importlib
+import json
 from pathlib import Path
 
 from django.conf import settings
@@ -47,10 +48,42 @@ from arches.app.models import models
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
+# Default HTTP verbs written into each resource's generated/<slug>.json on
+# first run. Hand-edit the file afterward; regeneration reads, never clobbers.
+DEFAULT_VERBS = ["GET"]
+
 
 def slug_to_class_prefix(slug):
     """Convert a graph slug like ``heritage_site`` to ``HeritageSite``."""
     return "".join(part.capitalize() for part in slug.replace("-", "_").split("_"))
+
+
+def view_bases(verbs):
+    """Pick (list_base, detail_base) DRF generic class names from a resource's
+    verbs: collection = GET (list) / POST (create); detail = GET (retrieve) /
+    PUT,PATCH (update) / DELETE (destroy). Selects the base, not the
+    persistence logic -- writes assume the mixins support create/update.
+    """
+    verbs = {v.upper() for v in verbs}
+    has_get = "GET" in verbs
+
+    if "POST" in verbs:
+        list_base = "ListCreateAPIView" if has_get else "CreateAPIView"
+    else:
+        list_base = "ListAPIView"
+
+    can_update = bool(verbs & {"PUT", "PATCH"})
+    can_delete = "DELETE" in verbs
+    if can_update and can_delete:
+        detail_base = "RetrieveUpdateDestroyAPIView"
+    elif can_update:
+        detail_base = "RetrieveUpdateAPIView"
+    elif can_delete:
+        detail_base = "RetrieveDestroyAPIView"
+    else:
+        detail_base = "RetrieveAPIView"
+
+    return list_base, detail_base
 
 
 def normalize_path_prefix(value):
@@ -185,6 +218,14 @@ class Command(BaseCommand):
         template = engine.get_template(template_name)
         return template.render(Context(context, autoescape=False))
 
+    def load_verbs(self, path):
+        """Read the slug -> verbs map from generated/verbs.json (single file
+        for all resources). Returns {} when absent; missing slugs are filled
+        with defaults and written back by save_verbs."""
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+        return {}
+
     def write(self, path, content, dry_run):
         if dry_run:
             self.stdout.write(f"[dry-run] would write {path}")
@@ -240,10 +281,21 @@ class Command(BaseCommand):
         entries = []  # shared context for __init__.py-tpl and urls template
         skipped = 0
 
+        verbs_path = generated_dir / "verbs.json"
+        verbs_map = self.load_verbs(verbs_path)
+
         for graph in graphs:
             slug = graph.slug
             class_prefix = slug_to_class_prefix(slug)
-            entries.append({"module_name": slug, "class_prefix": class_prefix})
+            verbs = verbs_map.setdefault(slug, list(DEFAULT_VERBS))
+            list_base, detail_base = view_bases(verbs)
+            entries.append(
+                {
+                    "module_name": slug,
+                    "class_prefix": class_prefix,
+                    "verbs": verbs,
+                }
+            )
 
             module_path = generated_dir / f"{slug}.py"
             if module_path.exists() and not overwrite:
@@ -262,9 +314,19 @@ class Command(BaseCommand):
                     "slug": slug,
                     "class_prefix": class_prefix,
                     "label": str(graph.name) or class_prefix,
+                    "verbs": verbs,
+                    "list_base": list_base,
+                    "detail_base": detail_base,
                 },
             )
             self.write(module_path, content, dry_run)
+
+        if set(verbs_map) - set(self.load_verbs(verbs_path)):
+            self.write(
+                verbs_path,
+                json.dumps(verbs_map, indent=2, sort_keys=True) + "\n",
+                dry_run,
+            )
 
         all_names = sorted(
             f"{entry['class_prefix']}{suffix}"
