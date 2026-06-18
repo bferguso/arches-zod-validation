@@ -48,8 +48,9 @@ from arches.app.models import models
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
-# Default HTTP verbs written into each resource's generated/<slug>.json on
-# first run. Hand-edit the file afterward; regeneration reads, never clobbers.
+# Default verbs assigned to a newly-seen resource in generated/generate.json.
+# Hand-edit afterward; regeneration reads, never clobbers. An empty list ([])
+# excludes the resource from generation.
 DEFAULT_VERBS = ["GET"]
 
 
@@ -218,10 +219,10 @@ class Command(BaseCommand):
         template = engine.get_template(template_name)
         return template.render(Context(context, autoescape=False))
 
-    def load_verbs(self, path):
-        """Read the slug -> verbs map from generated/verbs.json (single file
-        for all resources). Returns {} when absent; missing slugs are filled
-        with defaults and written back by save_verbs."""
+    def load_manifest(self, path):
+        """Read the slug -> verbs map from generated/generate.json (single
+        manifest for all resources). Returns {} when absent; missing slugs are
+        filled with defaults below. An empty verb list excludes the resource."""
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
         return {}
@@ -280,14 +281,22 @@ class Command(BaseCommand):
 
         entries = []  # shared context for __init__.py-tpl and urls template
         skipped = 0
+        excluded = 0
 
-        verbs_path = generated_dir / "verbs.json"
-        verbs_map = self.load_verbs(verbs_path)
+        manifest_path = generated_dir / "generate.json"
+        manifest = self.load_manifest(manifest_path)
 
         for graph in graphs:
             slug = graph.slug
+            # Missing slug -> default verbs; empty list -> excluded entirely
+            # (no module, no url, no __init__ entry). Edit generate.json to opt
+            # a resource in/out.
+            verbs = manifest.setdefault(slug, list(DEFAULT_VERBS))
+            if not verbs:
+                self.stdout.write(f"Excluding {slug} (empty verbs in generate.json).")
+                excluded += 1
+                continue
             class_prefix = slug_to_class_prefix(slug)
-            verbs = verbs_map.setdefault(slug, list(DEFAULT_VERBS))
             list_base, detail_base = view_bases(verbs)
             entries.append(
                 {
@@ -321,10 +330,10 @@ class Command(BaseCommand):
             )
             self.write(module_path, content, dry_run)
 
-        if set(verbs_map) - set(self.load_verbs(verbs_path)):
+        if set(manifest) - set(self.load_manifest(manifest_path)):
             self.write(
-                verbs_path,
-                json.dumps(verbs_map, indent=2, sort_keys=True) + "\n",
+                manifest_path,
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 dry_run,
             )
 
@@ -368,6 +377,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"Done. {len(entries)} graph(s) processed"
                 + (f", {skipped} module(s) left untouched" if skipped else "")
+                + (f", {excluded} excluded" if excluded else "")
                 + ("." if not dry_run else " (dry run).")
             )
         )
