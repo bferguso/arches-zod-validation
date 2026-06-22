@@ -295,6 +295,15 @@ class Command(BaseCommand):
             if not verbs:
                 self.stdout.write(f"Excluding {slug} (empty verbs in generate.json).")
                 excluded += 1
+                # Remove a previously-generated module so excluding a resource
+                # takes it out of the package, not just the urls/__init__ wiring.
+                stale = generated_dir / f"{slug}.py"
+                if stale.exists():
+                    if dry_run:
+                        self.stdout.write(f"[dry-run] would delete {stale}")
+                    else:
+                        stale.unlink()
+                        self.stdout.write(self.style.WARNING(f"Deleted {stale}"))
                 continue
             class_prefix = slug_to_class_prefix(slug)
             list_base, detail_base = view_bases(verbs)
